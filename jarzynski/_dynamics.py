@@ -168,3 +168,23 @@ def update(dt, state):
         'cylinders': cylinders,
     }
     return tf, state, work
+
+
+def updates(n, state):
+    body = lambda i, state: update(jnp.inf, state)[1]
+    return jax.lax.fori_loop(0, n, body, state)
+
+
+def forward(t, state):
+    def cond(val):
+        t0, state, n, work = val
+        return t0 < t
+
+    def body(val):
+        t0, state, n, work = val
+        dt, state, w = update(t - t0, state)
+        return t0 + dt, state, n + 1, work + w
+
+    t, state, n, work = jax.lax.while_loop(cond, body, (jnp.array(0.0), state, jnp.array(0), jnp.array(0.0)))
+
+    return n, state, work
