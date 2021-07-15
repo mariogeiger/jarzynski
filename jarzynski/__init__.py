@@ -1,6 +1,6 @@
 from ._util import imap
 from ._dynamics import forward
-from ._piston import init_piston, energy, compression
+from ._piston import init_piston, energy
 
 __all__ = [
     'imap',
@@ -9,5 +9,4 @@ __all__ = [
 
     'init_piston',
     'energy',
-    'compression',
 ]

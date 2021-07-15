@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-from ._dynamics import forward
 
 
 def random_piston_positions(key, n, r):
@@ -90,43 +89,3 @@ def energy(state):
 
 # energy_j = jax.jit(energy)
 # energy_vj = jax.jit(jax.vmap(energy, (0,), 0))
-
-
-def compression(key, n, r, vel):
-    state = init_piston(key, n, r)
-
-    # # equilibiate with some collisions, not necessary
-    # state = updates(n, state)
-
-    # move from pos. 1.0 to pos. 0.0 at velocity vel
-    state['walls']['v'] = jnp.array([
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, -vel],
-    ])
-
-    n, state, work = forward(1.0 / vel, state)
-
-    return work
-
-
-# compression_j = jax.jit(compression, static_argnums=1)
-# compression_vj = jax.jit(
-#     imap(
-#         compression,
-#         (0, None, None, None),
-#         0
-#     ),
-#     static_argnums=1
-# )
-# compression_vvj = jax.jit(
-#     imap(
-#         imap(
-#             compression,
-#             (0, None, None, None),
-#             0
-#         ),
-#         (None, None, None, 0),
-#         0
-#     ),
-#     static_argnums=1
-# )
