@@ -27,7 +27,7 @@ def random_piston_positions(key, n, r):
     pos = 2.0 * jnp.ones((n, 3))
     key, pos = jax.lax.fori_loop(0, n, body_for, (key, pos))
 
-    return pos
+    return key, pos
 
 
 def init_piston(key, n, r):
@@ -56,8 +56,7 @@ def init_piston(key, n, r):
         'm': jnp.array([jnp.inf]),
     }
 
-    key, k = jax.random.split(key)
-    x = random_piston_positions(k, n, r)
+    key, x = random_piston_positions(key, n, r)
 
     v = jax.random.normal(key, (n, 3))
 
