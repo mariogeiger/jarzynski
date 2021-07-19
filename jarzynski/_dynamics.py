@@ -123,7 +123,7 @@ def update(dt, state):
         v = balls['v']
         v = v.at[ia].set(va)
         v = v.at[ib].set(vb)
-        return v, 0.0
+        return v, walls['v'], cylinders['v'], 0.0
 
     def fun_bc(_):
         ia = bc.argmin() // bc.shape[1]
@@ -132,8 +132,13 @@ def update(dt, state):
         j = cylinders['j'][ic]
         n = x - j * jnp.sum(x * j) / jnp.sum(j * j)
 
-        va, _ = collision(n, balls['v'][ia], balls['m'][ia], cylinders['v'][ic], cylinders['m'][ic])
-        return balls['v'].at[ia].set(va), 0.0
+        va, vc = collision(n, balls['v'][ia], balls['m'][ia], cylinders['v'][ic], cylinders['m'][ic])
+        return (
+            balls['v'].at[ia].set(va),
+            walls['v'],
+            cylinders['v'].at[ic].set(vc),
+            0.0
+        )
 
     def fun_bw(_):
         ib = bw.argmin() // bw.shape[1]
@@ -141,10 +146,15 @@ def update(dt, state):
         n = jnp.cross(walls['j'][iw], walls['k'][iw])
         vb0, mb, vw, mw = balls['v'][ib], balls['m'][ib], walls['v'][iw], walls['m'][iw]
 
-        vb1, _ = collision(n, vb0, mb, vw, mw)
+        vb1, vw1 = collision(n, vb0, mb, vw, mw)
         work = mb * jnp.sum((vb1 - vb0) * vw)
 
-        return balls['v'].at[ib].set(vb1), work
+        return (
+            balls['v'].at[ib].set(vb1),
+            walls['v'].at[iw].set(vw1),
+            cylinders['v'],
+            work
+        )
 
     def bar(_):
         def foo(_):
@@ -156,7 +166,12 @@ def update(dt, state):
 
         return jax.lax.cond(bb.min() == tcol, fun_bb, foo, None)
 
-    balls['v'], work = jax.lax.cond(tf == tcol, bar, lambda _: (balls['v'], 0.0), None)
+    balls['v'], walls['v'], cylinders['v'], work = jax.lax.cond(
+        tf == tcol,
+        bar,
+        lambda _: (balls['v'], walls['v'], cylinders['v'], 0.0),
+        None
+    )
 
     state = {
         'balls': balls,
