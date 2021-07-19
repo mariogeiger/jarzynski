@@ -8,18 +8,18 @@ def ball_ball_collision_time(a, b):
     r = a['r'] + b['r']
     xv = jnp.sum(x * v)
 
-    def f(pa):
-        x, v, r = pa
+    def f(_):
         vv = jnp.sum(v * v)
         dis = xv * xv - vv * (jnp.sum(x * x) - r * r)
 
-        def g(pa):
-            xv, vv, dis = pa
-            return (-xv - jnp.sqrt(dis)) / vv
+        return jax.lax.cond(
+            dis > 0.0,
+            lambda _: (-xv - jnp.sqrt(dis)) / vv,
+            lambda _: jnp.inf,
+            None
+        )
 
-        return jax.lax.cond(dis > 0.0, g, lambda _: jnp.inf, (xv, vv, dis))
-
-    return jax.lax.cond(xv < 0.0, f, lambda _: jnp.inf, (x, v, r))
+    return jax.lax.cond(xv < 0.0, f, lambda _: jnp.inf, None)
 
 
 def ball_wall_collision_time(a, w):
@@ -31,16 +31,12 @@ def ball_wall_collision_time(a, w):
     vn = jnp.sum(v * n)
     xn = jnp.sum(x * n)
 
-    def f(pa):
-        x, v, n, xn, vn, r, njck, j, k = pa
-        t = -xn / vn - jnp.abs(r / vn)
-        x = x + t * v
-        xcn = jnp.cross(x, n)
-        a = -jnp.sum(xcn * k) / njck
-        b = jnp.sum(xcn * j) / njck
-        return jnp.where((a < 0.0) | (a > 1.0) | (b < 0.0) | (b > 1.0), jnp.inf, t)
-
-    return jax.lax.cond(xn * vn < 0.0, f, lambda _: jnp.inf, (x, v, n, xn, vn, a['r'], njck, w['j'], w['k']))
+    return jax.lax.cond(
+        xn * vn < 0.0,
+        lambda _: -xn / vn - jnp.abs(a['r'] / vn),
+        lambda _: jnp.inf,
+        None
+    )
 
 
 def ball_cylinder_collision_time(a, c):
@@ -66,22 +62,22 @@ def ball_cylinder_collision_time(a, c):
     def outside(_):
         return jax.lax.cond(xv > 0.0, lambda _: jnp.inf, sol, -1)
 
-    def cont(_):
+    def exists(_):
         return jax.lax.cond(xx < c['r']**2, sol, outside, 1)
 
-    return jax.lax.cond(dis > 0.0, cont, lambda _: jnp.inf, None)
+    return jax.lax.cond(dis > 0.0, exists, lambda _: jnp.inf, None)
 
 
 def collision(n, va, ma, vb, mb):
     def col(pa):
         n, va, ma, vb, mb = pa
-        def vb_(pa):
-            va, ma, vb, mb = pa
-            return vb
-        def fv_(pa):
-            va, ma, vb, mb = pa
-            return (ma * va + mb * vb) / (ma + mb)
-        fv = jax.lax.cond(jnp.isinf(mb), vb_, fv_, (va, ma, vb, mb))
+
+        fv = jax.lax.cond(
+            jnp.isinf(mb),
+            lambda _: vb,
+            lambda _: (ma * va + mb * vb) / (ma + mb),
+            None
+        )
 
         # go in rest frame
         va = va - fv
