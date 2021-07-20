@@ -107,6 +107,10 @@ def update(dt, state):
     bc = jax.vmap(jax.vmap(ball_cylinder_collision_time, (None, 0), 0), (0, None), 0)(balls, cylinders)
     bw = jax.vmap(jax.vmap(ball_wall_collision_time, (None, 0), 0), (0, None), 0)(balls, walls)
 
+    bb = jnp.maximum(bb, 0.0)
+    bc = jnp.maximum(bc, 0.0)
+    bw = jnp.maximum(bw, 0.0)
+
     tcol = jnp.array([bb.min(initial=jnp.inf), bc.min(initial=jnp.inf), bw.min(initial=jnp.inf)]).min()
     tf = jnp.min(jnp.array([dt, tcol]))
 
