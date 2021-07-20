@@ -100,6 +100,14 @@ def collision(n, va, ma, vb, mb):
     return jax.lax.cond(jnp.isinf(ma), col_a_inf, col, (n, va, ma, vb, mb))
 
 
+def _min(x, initial):
+    x = x.flatten()
+    if x.shape[0] == 0:
+        return initial, 0
+    i = jnp.argmin(x)
+    return x[i], i
+
+
 def update(dt, state):
     balls, walls, cylinders = state['balls'], state['walls'], state['cylinders']
 
@@ -111,16 +119,20 @@ def update(dt, state):
     bc = jnp.maximum(bc, 0.0)
     bw = jnp.maximum(bw, 0.0)
 
-    tcol = jnp.array([bb.min(initial=jnp.inf), bc.min(initial=jnp.inf), bw.min(initial=jnp.inf)]).min()
-    tf = jnp.min(jnp.array([dt, tcol]))
+    bb_min, bb_amin = _min(bb, jnp.inf)
+    bc_min, bc_amin = _min(bc, jnp.inf)
+    bw_min, bw_amin = _min(bw, jnp.inf)
+
+    tcol = jnp.min(jnp.array([bb_min, bc_min, bw_min]))
+    tf = jnp.minimum(dt, tcol)
 
     balls['x'] = balls['x'] + tf * balls['v']
     walls['x'] = walls['x'] + tf * walls['v']
     cylinders['x'] = cylinders['x'] + tf * cylinders['v']
 
     def fun_bb(_):
-        ia = bb.argmin() // bb.shape[1]
-        ib = bb.argmin() % bb.shape[1]
+        ia = bb_amin // bb.shape[1]
+        ib = bb_amin % bb.shape[1]
         n = balls['x'][ia] - balls['x'][ib]
 
         va, vb = collision(n, balls['v'][ia], balls['m'][ia], balls['v'][ib], balls['m'][ib])
@@ -130,8 +142,8 @@ def update(dt, state):
         return v, walls['v'], cylinders['v'], 0.0
 
     def fun_bc(_):
-        ia = bc.argmin() // bc.shape[1]
-        ic = bc.argmin() % bc.shape[1]
+        ia = bc_amin // bc.shape[1]
+        ic = bc_amin % bc.shape[1]
         x = balls['x'][ia] - cylinders['x'][ic]
         j = cylinders['j'][ic]
         n = x - j * jnp.sum(x * j) / jnp.sum(j * j)
@@ -145,8 +157,8 @@ def update(dt, state):
         )
 
     def fun_bw(_):
-        ib = bw.argmin() // bw.shape[1]
-        iw = bw.argmin() % bw.shape[1]
+        ib = bw_amin // bw.shape[1]
+        iw = bw_amin % bw.shape[1]
         n = jnp.cross(walls['j'][iw], walls['k'][iw])
         vb0, mb, vw, mw = balls['v'][ib], balls['m'][ib], walls['v'][iw], walls['m'][iw]
 
@@ -166,9 +178,9 @@ def update(dt, state):
                 return fun_bw(None)
             if walls['x'].shape[0] == 0:
                 return fun_bc(None)
-            return jax.lax.cond(bw.min() == tcol, fun_bw, fun_bc, None)
+            return jax.lax.cond(bw_min == tcol, fun_bw, fun_bc, None)
 
-        return jax.lax.cond(bb.min() == tcol, fun_bb, foo, None)
+        return jax.lax.cond(bb_min == tcol, fun_bb, foo, None)
 
     balls['v'], walls['v'], cylinders['v'], work = jax.lax.cond(
         tf == tcol,
