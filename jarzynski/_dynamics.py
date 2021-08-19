@@ -197,9 +197,13 @@ def update(dt, state):
     return tf, state, work
 
 
-def updates(n, state):
-    body = lambda i, state: update(jnp.inf, state)[1]
-    return jax.lax.fori_loop(0, n, body, state)
+def forward_n(n, state):
+    def body(i, args):
+        t, state = args
+        dt, state, _ = update(jnp.inf, state)
+        return t + dt, state
+
+    return jax.lax.fori_loop(0, n, body, (0.0, state))
 
 
 def forward(t, state):
